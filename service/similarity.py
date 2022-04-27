@@ -1,12 +1,13 @@
 import os
 # from config import mysql
+import pandas as pd
 import pymysql
 import configparser
 import time
 
+
 config = configparser.ConfigParser()
 config.read('config.ini', encoding='utf-8')
-
 
 def findSimilarity(text, content, id):
     '''
@@ -19,17 +20,17 @@ def findSimilarity(text, content, id):
     textList = text.split(' ')
     contentList = content.split(' ')
     result = []
-
+    srch_scope = 6 # 문단 수
+    start = time.time()
     for i in range(len(contentList)):
-        if i + 6 > len(contentList): break
+        if i + srch_scope > len(contentList): break
 
-        fiveWordList = contentList[i:i + 6]  # 비교할 content 영역
-
+        fiveWordList = contentList[i:i + srch_scope]  # 비교할 content 영역
         for j in range(len(textList)):
-            if j + 6 > len(textList): break
+            if j + srch_scope > len(textList): break
 
-            if (fiveWordList == textList[j:j + 6]):
-                originText = " ".join(textList[j:j + 6])
+            if (fiveWordList == textList[j:j + srch_scope]):
+                originText = " ".join(textList[j:j + srch_scope])
                 result.append((originText, id))
 
     return result
@@ -60,14 +61,15 @@ def read_contents_from_database():
     finally:
         curs.close()
         conn.close()
-
     return contentList
 
 
 def make_similarity_response_data(text):
     start = time.time()  # 시작 시간 저장
     contentList = read_contents_from_database()
-
+    #pd.DataFrame(contentList).to_csv('test.csv',encoding='utf-8',index=False)
+    #contentList = list(pd.read_csv('../test.csv',encoding='utf-8')[1])
+    print('dbtime{}'.format(time.time()-start))
     if contentList is Exception:
         return "데이터 베이스를 읽는데 실패했습니다."
 
@@ -86,22 +88,23 @@ def make_similarity_response_data(text):
             for items in contentAndId:
                 firstList.append(items)
 
-    secondList = []  # 중복되지 않은 Content 리스트
-    for items in firstList:
-        if not items[0] in secondList:
-            secondList.append(items[0])
+
+        secondList = []  # 중복되지 않은 Content 리스트
+        for items in firstList:
+            if not items[0] in secondList:
+                secondList.append(items[0])
+    print('items_time:{}'.format(time.time() - start))
 
     for index, content in enumerate(secondList):
         newList = []
-        if index %3 == 0 :
+        if index %3 == 0 : #인덱스가 3의 배수인 경우에만 실행
             newDict = {"id": str(index), "originText": content}
+            print(content)
             newDict["similaritySearchData"] = newList
             similaritySentenceList.append(newDict)
-            print(newDict)
             count = 0
             for items in firstList: #firstList => [(,reviewId),(,reviewId),(,reviewId) ... ]
-                if content == items[0]:
-                    # newList.append(items[1])
+                if content == items[0]:                    # newList.append(items[1])
                     strCount = str(index) + "_" + str(count)
                     childDic = {"id": strCount, "originText" : items[1]}
                     newList.append(childDic)
